@@ -6,6 +6,23 @@ const app = express();
 app.use(express.json());
 
 
+const resolveProductByID = (req, res, next) => {
+    try {
+        const { params: { id } } = req;
+
+        const parsedId = parseInt(id);
+        if (isNaN(parsedId)) return res.status(400).json({ message: "Invalid Id" })
+
+        const productIndex = products.findIndex(product => product.id === parsedId);
+        if (productIndex === -1) return res.status(404).json({ message: "product not found" })
+
+        req.productIndex = productIndex;
+        next();
+    } catch (error) {
+        res.status(500).json({ message: "Internal server error" })
+    }
+}
+
 const PORT = process.env.POR || 3000;
 
 
@@ -30,19 +47,13 @@ app.get("/api/products", (req, res) => {
 })
 
 // route paramaters
-app.get("/api/products/:id", (req, res) => {
+app.get("/api/products/:id", resolveProductByID, (req, res) => {
     try {
-        // get id from params object in request object
-        const id = parseInt(req.params.id);
-
-        if (isNaN(id)) return res.status(400).json({ message: "Bad request. Invalid id" })
-
-        const product = products.find(product => product.id === id);
+        const { productIndex } = req;
+        const product = products[productIndex];
 
         if (!product) return res.status(404).json({ message: "Product not found" })
-
         res.status(200).json({ product })
-
     } catch (error) {
         res.status(500).json({ message: "Internal server error" })
     }
@@ -63,33 +74,19 @@ app.post("/api/products", (req, res) => {
 })
 
 // PUT
-app.put("/api/products/:id", (req, res) => {
+app.put("/api/products/:id", resolveProductByID, (req, res) => {
     try {
-        const { params: { id }, body } = req;
-
-        const parsedId = parseInt(id);
-        if (isNaN(parsedId)) return res.status(400).json({ message: "Invalid Id" })
-
-        const productIndex = products.findIndex(product => product.id === parsedId);
-        if (productIndex === -1) return res.status(404).json({ message: "product not found" })
-
-        products[productIndex] = { id: parsedId, ...body };
-
+        const { productIndex, body } = req;
+        products[productIndex] = { id: products[productIndex].id, ...body };
         res.status(201).json({ product: products[productIndex] })
-        // return res.sendStatus(201).send(products[productIndex])
     } catch (error) {
         res.status(500).json({ message: "Internal server error" })
     }
 })
 
-app.patch("/api/products/:id", (req, res) => {
+app.patch("/api/products/:id", resolveProductByID, (req, res) => {
     try {
-        const { params: { id }, body } = req;
-
-        const parsedId = parseInt(id);
-        if (isNaN(parsedId)) return res.sendStatus(400)
-        const productIndex = products.findIndex(product => product.id === parsedId);
-        if (productIndex === -1) return res.sendStatus(404)
+        const { productIndex, body } = req;
 
         products[productIndex] = { ...products[productIndex], ...body };
         res.sendStatus(201);
@@ -98,14 +95,9 @@ app.patch("/api/products/:id", (req, res) => {
     }
 })
 
-app.delete("/api/products/:id", (req, res) => {
+app.delete("/api/products/:id", resolveProductByID, (req, res) => {
     try {
-        const { params: { id } } = req;
-
-        const parsedId = parseInt(id);
-        if (isNaN(parsedId)) return res.sendStatus(400);
-        const productIndex = products.findIndex(product => product.id === parsedId);
-        if (productIndex === -1) return res.sendStatus(404)
+        const { productIndex } = req;
 
         products.splice(productIndex, 1)
         return res.sendStatus(200)
